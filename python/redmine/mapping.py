@@ -23,20 +23,35 @@ class Mapping(object):
         'Due Date'     : 'date',
         'Estimation'   : 'period',
         'Subsystem'    : 'ownedField[1]',
-        'Fix versions' : 'version[*]'
+        'Fix versions' : 'version[*]',
+        'QA-Contact'   : 'user[1]',
+        'PDash Task'   : 'string',
+        'Patch Version': 'version[1]',
+        'Freshdesk URL': 'string',
+        'Customer'     : 'string',
+        'Affected Version': 'string',
+        'Customer Issue': 'string',
+        'Merge Request': 'string'
     }
 
     CONVERSION = {
         'State': {
-            'Resolved' : 'Fixed',
-            'Closed'   : 'Fixed',
-            'Rejected' : "Won't fix"
+            # 'New':          'New',
+            # 'Accepted':     'Accepted',
+            # 'Assigned':     'Assigned',
+            # 'Red':          'Red',
+            # 'Yellow':       'Yellow',
+            # 'Green':        'Green',
+            # 'Released':     'Released',
+            # 'Discarded':    'Discarded',
+            # 'Input Needed': 'Input Needed'
         },
         'Priority': {
-            'High'      : 'Major',
-            'Low'       : 'Minor',
-            'Urgent'    : 'Critical',
-            'Immediate' : 'Show-stopper'
+            'Low'       : 'Low',
+            'Normal'    : 'Normal',
+            'High'      : 'High',
+            'Urgent'    : 'Urgent',
+            'Immediate' : 'Immediate'
         }
     }
 

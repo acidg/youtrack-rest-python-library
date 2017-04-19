@@ -13,6 +13,7 @@ import youtrack.connection
 from youtrack.importHelper import create_bundle_safe
 from datetime import datetime
 from dateutil import parser
+import logging
 
 
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
@@ -48,6 +49,7 @@ def main():
     try:
         params = {}
         r_api_key = None
+        logging.basicConfig(level=logging.WARN)
         opts, args = getopt.getopt(sys.argv[1:], 'hta:')
         for opt, val in opts:
             if opt == '-h':
@@ -57,7 +59,9 @@ def main():
                 params['import_time_entries'] = True
             if opt == '-a':
                 r_api_key = val
-        if r_api_key: 
+            if opt == '-v':
+                logging.basicConfig(level=logging.DEBUG)
+        if r_api_key:
             r_url, y_url, y_user, y_password = args[:4]
             project_ids = args[4:]
             redmine_importer = RedmineImporter(
@@ -68,11 +72,11 @@ def main():
             redmine_importer = RedmineImporter(
                 None, r_url, r_user, r_password, y_url, y_user, y_password, params)
     except getopt.GetoptError, e:
-        print e
+        logging.error(e)
         usage()
         sys.exit(1)
     except ValueError, e:
-        print 'Not enough arguments'
+        logging.error('Not enough arguments')
         usage()
         sys.exit(1)
     redmine_importer.do_import(project_ids)
@@ -114,7 +118,7 @@ class RedmineImporter(object):
         try:
             projects2import = self._get_projects(project_ids)
         except redmine.RedmineException, e:
-            print 'FATAL:', e
+            logging.fatal(e)
             sys.exit(1)
 
         print '===> Import Roles'
@@ -122,7 +126,7 @@ class RedmineImporter(object):
 
         for project in projects2import.values():
             self._import_project(project)
-        
+
         print '===> Apply Relations'
         self._apply_relations()
 
@@ -171,13 +175,13 @@ class RedmineImporter(object):
         project_desc = ''
         if hasattr(project, 'description') and project.description is not None:
             project_desc = project.description
-        
+
         print "===> Importing Project '%s' (%s)" % \
             (project_name.encode('utf-8'), project_id.encode('utf-8'))
         try:
             print 'Creating project...'
             self._target.getProject(project_id)
-            print 'Project already exists'
+            logging.warn('Project already exists')
         except youtrack.YouTrackException:
             self._target.createProjectDetailed(
                 project_id, project_name, project_desc, self._project_lead)
@@ -204,8 +208,8 @@ class RedmineImporter(object):
                     user.login = user.email
                 else:
                     user.login = 'guest'
-                print 'Cannot get login for user id=%s, set it to "%s"' % \
-                    (user_id, user.login)
+                logging.warn('Cannot get login for user id=%s, set it to "%s"' % \
+                    (user_id, user.login))
             if user.login != 'guest':
                 if redmine_user.firstname is None and redmine_user.lastname is None:
                     user.fullName = user.login
@@ -402,8 +406,8 @@ class RedmineImporter(object):
                         value = self._to_yt_version(value)
                     self._add_field_to_issue(project_id, issue, name, value)
         except Exception, e:
-            print 'Failed to process issue:'
-            print redmine_issue
+            logging.error('Failed to process issue:')
+            logging.error(redmine_issue)
             traceback.print_exc()
             raise e
         return issue
@@ -485,10 +489,10 @@ class RedmineImporter(object):
                         field_type.startswith('ownedField')):
                     value = value.name
             self._target.addValueToBundle(bundle, value)
-            return value
         except youtrack.YouTrackException, e:
             if e.response.status != 409 or e.response.reason.lower() != 'conflict':
-                print e
+                logging.warn('Error creating field', e)
+        return value
 
     def _get_value_presentation(self, field_type, value):
         if field_type == 'date':
@@ -577,7 +581,7 @@ class RedmineImporter(object):
         if hasattr(issue, 'relations'):
             for rel in issue.relations:
                 if rel.relation_type not in link_types:
-                    print 'Unsuitable link type: %s. Skipped' % rel.relation_type
+                    logging.warn('Unsuitable link type: %s. Skipped' % rel.relation_type)
                     continue
                 from_id = rel.issue_id
                 to_id = rel.issue_to_id
@@ -609,9 +613,9 @@ class RedmineImporter(object):
                         link.source = self._to_yt_issue_id(from_id)
                         link.target = self._to_yt_issue_id(to_id)
                     except KeyError, e:
-                        print "Cannot apply link (%s) to issues: %d and %d" % \
-                            (link_type, from_id, to_id)
-                        print "Some issues were not imported to YouTrack"
+                        logging.error("Cannot apply link (%s) to issues: %d and %d" % \
+                            (link_type, from_id, to_id))
+                        logging.error("Some issues were not imported to YouTrack")
                         raise e
                     links.append(link)
                     if len(links) >= limit:
@@ -619,7 +623,7 @@ class RedmineImporter(object):
                         del links[0:]
         if links:
             self._target.importLinks(links)
-            
+
 
 class RedmineAttachment(object):
     def __init__(self, attach, source):

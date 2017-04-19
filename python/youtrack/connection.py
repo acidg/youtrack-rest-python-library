@@ -14,6 +14,7 @@ import urllib2_file
 import tempfile
 import functools
 import re
+import logging
 
 def urlquote(s):
     return urllib.quote(utf8encode(s), safe="")
@@ -181,22 +182,22 @@ class Connection(object):
             contentLength = None
             if 'content-length' in content.headers.dict:
                 contentLength = int(content.headers.dict['content-length'])
-            print 'Importing attachment for issue ', issueId
+            logging.debug('Importing attachment for issue ', issueId)
             try:
-                print 'Name: ', utf8encode(a.name)
+                logging.debug('Name: ', utf8encode(a.name))
             except Exception, e:
-                print e
+                logging.debug(e)
             try:
-                print 'Author: ', a.authorLogin
+                logging.debug('Author: ', a.authorLogin)
             except Exception, e:
-                print e
+                logging.debug(e)
             return self.importAttachment(issueId, a.name, content, a.authorLogin,
                 contentLength=contentLength,
                 contentType=content.info().type,
                 created=a.created if hasattr(a, 'created') else None,
                 group=utf8encode(a.group) if hasattr(a, 'group') else '')
         except urllib2.HTTPError, e:
-            print "Can't create attachment"
+            logging.warn("Can't create attachment")
             try:
                 err_content = e.read()
                 issue_id = issueId
@@ -210,18 +211,22 @@ class Connection(object):
                     attach_name = attach_name.encode('utf-8')
                 if isinstance(attach_url, unicode):
                     attach_url = attach_url.encode('utf-8')
-                print "HTTP CODE: ", e.code
-                print "REASON: ", err_content
-                print "IssueId: ", issue_id
-                print "Attachment filename: ", attach_name
-                print "Attachment URL: ", attach_url
+
+                if e.code and e.code == 404:
+                    logging.warn("Attachment %s not found for issue %s" % (a.url, issueId))
+                else:
+                    logging.warn("HTTP CODE: ", e.code)
+                    logging.warn("REASON: ", err_content)
+                    logging.warn("IssueId: ", issue_id)
+                    logging.warn("Attachment filename: ", attach_name)
+                    logging.warn("Attachment URL: ", attach_url)
             except Exception:
                 pass
         except Exception, e:
             try:
-                print content.geturl()
-                print content.getcode()
-                print content.info()
+                logging.error(content.geturl())
+                logging.error(content.getcode())
+                logging.error(content.info())
             except Exception:
                 pass
             raise e
@@ -445,30 +450,29 @@ class Connection(object):
         try:
             response = result.toxml().encode('utf-8')
         except:
-            sys.stderr.write("can't parse response")
-            sys.stderr.write("request was")
-            sys.stderr.write(xml)
+            logging.error("can't parse response")
+            logging.debug("request was")
+            logging.debug(xml)
             return response
         item_elements = minidom.parseString(response).getElementsByTagName("item")
         if len(item_elements) != len(issues):
-            sys.stderr.write(response)
+            logging.warn(response)
         else:
             for item in item_elements:
                 id = item.attributes["id"].value
                 imported = item.attributes["imported"].value.lower()
                 if imported == "true":
-                    print "Issue [ %s-%s ] imported successfully" % (projectId, id)
+                    logging.debug("Issue [ %s-%s ] imported successfully" % (projectId, id))
                 else:
-                    sys.stderr.write("")
-                    sys.stderr.write("Failed to import issue [ %s-%s ]." % (projectId, id))
-                    sys.stderr.write("Reason : ")
-                    sys.stderr.write(item.toxml())
-                    sys.stderr.write("Request was :")
+                    logging.warn("")
+                    logging.warn("Failed to import issue [ %s-%s ]." % (projectId, id))
+                    logging.warn("Reason : ")
+                    logging.warn(item.toxml())
+                    logging.warn("Request was :")
                     if isinstance(issue_records[id], unicode):
-                        sys.stderr.write(issue_records[id].encode('utf-8'))
+                        logging.warn(issue_records[id].encode('utf-8'))
                     else:
-                        sys.stderr.write(issue_records[id])
-                print ""
+                        logging.warn(issue_records[id])
         return response
 
     def getProjects(self):
@@ -883,7 +887,7 @@ class Connection(object):
             return [youtrack.WorkItem(e, self) for e in xml.documentElement.childNodes if
                     e.nodeType == Node.ELEMENT_NODE]
         except youtrack.YouTrackException, e:
-            print "Can't get work items.", str(e)
+            logging.warn("Can't get work items.", str(e))
             return []
 
 
